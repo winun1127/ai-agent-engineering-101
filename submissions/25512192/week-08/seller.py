@@ -14,6 +14,9 @@ What the code enforces (whatever the harness says):
   - a task that is finished gets an error (the SDK does this for terminal tasks);
   - week 07: the receipt is {shop, item, price, task} plus sig_seller, an Ed25519 signature
     with shop_key.pem (or the SHOP_KEY secret when deployed) over its canonical JSON.
+  - week 08 (Round 3): the item is a unit from the kit's stock (stock.py picks it); its reserve is the floor
+    stock.terms() computes from the unit's cost and state/policy.json, never the harness. The receipt adds
+    unit, claim (honest grade) and warranty_hours; every sale goes to state/sales.jsonl for the strategist.
 """
 import argparse
 import asyncio
@@ -38,6 +41,9 @@ from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
 
 import harness
+import market_memory as mm
+import policy
+import stock
 from catalog import Catalog, brief
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -52,7 +58,7 @@ DEFAULT = {
 }
 SMALL_CATALOG = 12          # up to this many items the harness sees the whole catalog
 
-SYSTEM = ("You are the pricing brain of a furniture shop's sales agent. You decide which item a buyer "
+SYSTEM = ("You are the pricing brain of a shop's sales agent. You decide which item a buyer "
           "means and how to negotiate its price. Answer with exactly one JSON object and nothing else.")
 
 SEARCH_PROMPT = """A buyer wrote to the shop:
@@ -106,6 +112,8 @@ def clean(msg, tag):
     msg = msg.translate(str.maketrans({"—": "-", "–": "-", "’": "'", "‘": "'",
                                        "“": '"', "”": '"', "…": "..."}))
     msg = msg.encode("ascii", "ignore").decode()
+    if not re.search(r"[A-Za-z]", msg):     # week 08: a Korean sentence leaves only punctuation behind
+        return ""
     if re.search(r"\d", msg):
         log(f"[{tag}] GUARD dropped harness sentence with a number in it: {msg!r}")
         return ""
@@ -184,6 +192,22 @@ class Seller(AgentExecutor):
             self.open.pop(task.id, None)
             await getattr(up, how)(up.new_agent_message(parts=[new_text_part(msg)]))
 
+        if deal is None and stock.round3():   # Round 3: sell a unit from stock
+            taken = {d["item"].get("unit") for d in self.open.values()}
+            u = stock.find_unit(text, taken)
+            if u is None:
+                await finish("reject", "Sorry, we have none of that in stock. Ask for an item by its SKU.")
+                return
+            t = stock.terms(u, policy.load(), mm.read_json(mm.STATS, None) or mm.empty(), stock.load_catalog())
+            item = {"id": u["sku"], "name": u.get("name"), "reserve": t["floor"], "unit": u["unit"], "terms": t,
+                    "category": u.get("category"), "grade": u.get("grade")}
+            self.open[task.id] = {"item": item, "ask": t["ask"], "opening": t["ask"], "history": []}
+            log(f"[{tag}] unit {u['unit']} {u['sku']} grade {u.get('grade')} cost {t['cost']} list {t['list_price']}"
+                f" -> floor {t['floor']}, ask {t['ask']}, claim {t['claim']}, warranty {t['warranty_hours']}")
+            await ask_buyer(f"In stock: {stock.describe(u, t)}. Send your offer as a number. Asking price: {t['ask']}",
+                            t["ask"])
+            return
+
         if deal is None:  # first message: which item, and at what price?
             cands = await self.candidates(text, tag)
             lines = "\n".join(f"{brief(i)} | reserve={i['reserve']}" for i in cands)
@@ -245,6 +269,16 @@ class Seller(AgentExecutor):
 
     async def close(self, up, task_id, item, price, tag):
         receipt = sign_receipt({"shop": self.cfg["name"], "item": item["id"], "price": int(price), "task": task_id})
+        t = item.get("terms")
+        if t:                     # Round 3: not under sig_seller; the kit's checkout takes them from this copy
+            receipt["unit"] = item["unit"]
+            if t["claim"]:
+                receipt["claim"] = t["claim"]
+            if t["warranty_hours"]:
+                receipt["warranty_hours"] = t["warranty_hours"]
+            mm.record_sale({"sku": item["id"], "name": item["name"], "category": item["category"], "unit": item["unit"],
+                            "price": int(price), "cost": t["cost"], "list_price": t["list_price"],
+                            "grade": item["grade"], "claim": t["claim"], "warranty_hours": t["warranty_hours"]})
         log(f"[{tag}] -> completed, receipt {json.dumps(receipt)}")
         self.open.pop(task_id, None)
         await up.add_artifact(parts=[new_data_part(receipt)], name="receipt")
@@ -272,7 +306,9 @@ def build(cfg, port):
         skills=[AgentSkill(
             id="negotiate",
             name="Negotiate a purchase",
-            description=("Sells: " + ", ".join(cats) + ". Name or describe the item in the first message; "
+            description=("Sells from stock (Round 3: food and goods, ask by SKU, e.g. 'I want to buy <name> (<sku>)'; "
+                         "every unit ships with the market's certificate, an honest grade claim, and a warranty on "
+                         "grade A goods). Before Round 3: " + ", ".join(cats) + ". Name or describe the item in the first message; "
                          "then send offers as a number on the same task. The current ask is the last number "
                          "of each reply and in metadata.ask; a deal ends with a signed receipt artifact {shop, item, price, task, sig_seller}."),
             tags=["shopping", "negotiation"] + cats,
