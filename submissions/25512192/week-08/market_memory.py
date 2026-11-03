@@ -48,7 +48,7 @@ def write_json(path, data):
 
 
 def empty():
-    return {"cursor": None, "synced_at": 0, "settles": 0, "categories": {}, "skus": {}, "shops": {}, "hourly": {}}
+    return {"cursor": None, "synced_at": 0, "settles": 0, "categories": {}, "skus": {}, "shops": {}, "hourly": {}, "refs": {}}
 
 
 def catalog(state_dir):
@@ -67,6 +67,8 @@ def fold(stats, e, cat):
     ratio = round(amount / lp, 3) if lp else None
     hour = str(int(e.get("ts", time.time()) // HOUR))
     stats["settles"] += 1
+    refs = stats.setdefault("refs", {})                    # newest ledger seqs per category, for forum citations
+    refs[category] = (refs.get(category, []) + [e.get("seq")])[-5:]
     stats["hourly"][hour] = stats["hourly"].get(hour, 0) + 1
 
     c = stats["categories"].setdefault(category, {"n": 0, "ratios": [], "last": 0, "recent": {}})
