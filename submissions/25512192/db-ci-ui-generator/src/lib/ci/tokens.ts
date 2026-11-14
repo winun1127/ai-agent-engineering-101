@@ -209,7 +209,7 @@ export const ciRules: { id: string; text: string; linted: boolean }[] = [
   },
   {
     id: "single-primary",
-    text: "한 화면에서 기본(primary) 버튼은 핵심 행동 1~2개에만 쓰고 나머지는 secondary/outline variant를 쓴다.",
+    text: "한 화면에서 기본(primary) 버튼은 핵심 행동 1~2개에만 쓰고 나머지는 variant 'secondary'를 쓴다.",
     linted: true,
   },
   {
