@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DB CI UI Studio
 
-## Getting Started
+프롬프트 한 줄을 **DB그룹 CI를 준수하는 화면**으로 바꾸는 AI 에이전트 기반 UI 생성 서비스.
+[json-render](https://json-render.dev) Playground를 벤치마킹했고, 여기에 "CI 자동 반영"과 "스스로 검증·수정하는 에이전트 루프"를 더했다.
 
-First, run the development server:
+- 스택: Next.js 16 (App Router) · json-render 0.22 (`core` / `react` / `shadcn`) · OpenAI Responses API (`gpt-6-luna`) · Tailwind CSS 4
+- 용도: DB Inc. 면접 데모
+
+## 실행
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # OPENAI_API_KEY 입력
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`OPENAI_API_KEY`가 없으면 **목 모드**로 뜬다(우측 상단에 노란 배지). 목 모드는 고정 샘플 스펙을 실제와 같은 JSONL 패치 스트림으로 흘려보내므로, 키 없이도 스트리밍 → 검증 → 수정 → 렌더링 전 과정을 볼 수 있다. 발표장 네트워크가 불안하면 `DEMO_MOCK=1`로 강제할 수 있다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run test:agent   # 목 모델로 에이전트 루프 3개 시나리오 실행 (키 불필요)
+npm run build        # 프로덕션 빌드
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 핵심 아이디어: CI를 세 겹으로 강제한다
 
-## Learn More
+LLM에게 "DB 색으로 만들어줘"라고 부탁하는 방식은 지켜질 때도 있고 아닐 때도 있다. 이 프로젝트는 CI를 프롬프트가 아니라 **구조**로 강제한다.
 
-To learn more about Next.js, take a look at the following resources:
+| 층 | 무엇이 | 어떻게 |
+|---|---|---|
+| 1. 카탈로그 | `src/lib/catalog.ts` | 모델은 카탈로그의 24개 컴포넌트만 쓸 수 있고, 컴포넌트에 색상 prop이 없다. 모델이 색을 정할 방법 자체가 없다. |
+| 2. 테마 토큰 | `src/lib/ci/tokens.ts` | 색·모서리·서체는 렌더러가 CSS 변수로 주입한다. 같은 스펙이 토큰만 바꾸면 다른 브랜드가 된다 ("CI 미적용" 토글로 비교). |
+| 3. CI 린트 + 수정 루프 | `src/lib/agent/validate.ts`, `run.ts` | 생성 결과를 규칙으로 기계 검사하고, 위반이 있으면 이슈를 모델에 되먹여 고치게 한다. |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`tokens.ts`가 단일 출처다. 여기 값이 (1) 미리보기 CSS 변수, (2) 시스템 프롬프트의 CI 규칙, (3) 린트 규칙에 동시에 쓰인다.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 에이전트 루프
 
-## Deploy on Vercel
+```
+plan ─▶ generate ─▶ validate ─┬─ 통과 ─▶ done
+              ▲               │
+              └── repair ◀────┘   (이슈를 모델에 되먹임, 최대 2회)
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **plan** — 계열사 도메인, 카탈로그, CI 규칙으로 시스템 프롬프트 조립 (`catalog.prompt()` + CI 규칙)
+2. **generate** — 모델이 json-render SpecStream(JSONL, RFC 6902 패치)을 출력. 서버는 라인 단위로 검사해 그대로 브라우저에 흘리고, 화면은 패치가 도착하는 대로 채워진다
+3. **validate** — LLM 없이 결정적으로 3개 층 검사
+   - 구조: 루트·자식 참조 무결성 (`validateSpec`, `autoFixSpec`)
+   - 카탈로그: 없는 컴포넌트, 잘못된 props (zod)
+   - CI: BrandHeader 1개·첫 자식 / 임의 색상 클래스 금지 / 이모지 금지 / primary 버튼 2개 이하
+4. **repair** — 이슈 목록 + 현재 스펙을 모델에 보내 "이 문제만 고치는 최소 패치"를 받는다. 다시 validate로
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+후속 프롬프트는 현재 화면에 대한 **패치**로 처리된다(전체 재생성 아님). 버전 목록에서 이전 화면으로 돌아갈 수 있다.
+
+## 데모 시나리오 (약 3분)
+
+1. 계열사 `DB Inc.` → 첫 번째 예시 클릭. 화면이 위에서부터 스트리밍으로 채워지는 것을 보여준다.
+2. 우측 상단 **CI 미적용** 토글 → 같은 스펙이 뉴트럴 테마로 바뀐다. "스펙에는 색이 없고 CI는 토큰에서 온다"를 설명.
+3. **패치 스트림** / **JSON 스펙** 탭 → 모델이 실제로 출력한 것이 코드가 아니라 선언적 JSON임을 보여준다.
+4. 마지막 예시(**CI 위반 시연**) 클릭 → **에이전트 로그** 탭에서 린트가 위반을 잡고, 수정 라운드를 거쳐 통과하는 과정을 보여준다.
+5. 수정 요청 입력("KPI 카드를 3개로 줄여줘") → 패치로 반영, 버전이 v2로 쌓인다.
+6. 계열사를 `DB손해보험`으로 바꿔 사고 접수 화면 생성 → 같은 CI, 다른 업무 맥락.
+
+## 구조
+
+```
+src/
+  lib/
+    ci/tokens.ts        CI 토큰·계열사·CI 규칙 (단일 출처)
+    catalog.ts          json-render 카탈로그 (shadcn 20개 + DB 전용 4개: BrandHeader, Metric, BarChart, Steps)
+    registry.tsx        카탈로그 → React 컴포넌트
+    agent/
+      run.ts            에이전트 루프 (async generator)
+      prompt.ts         시스템/사용자/수정 프롬프트 조립
+      validate.ts       구조 · 카탈로그 · CI 린트
+      llm.ts            OpenAI Responses 스트리밍 어댑터 + 목 LLM
+      samples.ts        목 모드·예시용 고정 스펙
+      events.ts         서버→클라이언트 JSONL 프로토콜
+  app/api/generate/route.ts   POST: 에이전트 실행 스트림 / GET: 현재 모드
+  hooks/use-agent-stream.ts   스트림 소비 훅 (패치 + 에이전트 이벤트)
+  components/playground.tsx   스튜디오 화면
+  components/preview.tsx      json-render Renderer + 테마 변수 주입
+scripts/test-agent.mts        키 없이 도는 에이전트 루프 테스트
+```
+
+## 알려진 한계 (면접 전에 확인할 것)
+
+- **CI 색상값은 근사값이다.** `tokens.ts`의 `brand` 블록 hex는 공개 로고의 그린을 눈으로 맞춘 값이다. 공식 CI 매뉴얼의 전용색상을 확보하면 그 블록만 교체하면 된다 (`globals.css`의 `:root` 기본값도 같이).
+- **로고는 넣지 않았다.** `BrandHeader`는 계열사명을 텍스트로 표시한다. 공식 로고 파일 사용은 CI 규정 확인 후 `registry.tsx`의 워드마크 자리에 넣는다.
+- **실제 OpenAI 호출 경로는 이 저장소 작업 환경에 키가 없어 실행 검증을 못 했다.** 타입체크·빌드는 통과했고 목 모델로 루프 전체를 검증했다. 키를 넣은 뒤 예시 프롬프트 3~4개를 미리 돌려 볼 것.
+- CI 린트 규칙 4개는 예시 수준이다. "정중한 한국어 문체" 같은 규칙은 프롬프트로만 전달되고 기계 검사는 하지 않는다.
+- 생성 화면의 `submit`/`navigate` 액션은 알림만 띄우는 데모 핸들러다.
