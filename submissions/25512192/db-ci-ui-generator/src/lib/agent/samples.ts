@@ -12,7 +12,7 @@ const stack = (
   justify: "start" | "between" | "end" | null = null,
 ) => ({
   type: "Stack",
-  props: { direction, gap, align: null, justify, className: null },
+  props: { direction, gap, align: direction === "vertical" ? "stretch" : "center", justify, className: null },
   children,
 });
 

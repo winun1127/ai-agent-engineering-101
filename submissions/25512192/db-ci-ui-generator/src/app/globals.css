@@ -1,26 +1,89 @@
 @import "tailwindcss";
+/* @json-render/shadcn 컴포넌트가 쓰는 유틸리티 클래스를 Tailwind가 생성하도록 스캔 대상에 추가 */
+@source "../../node_modules/@json-render/shadcn/dist";
 
+@layer base {
+  /* shadcn 관례: 색을 지정하지 않은 테두리는 CI의 border 토큰을 쓴다 */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
+
+/*
+ * 생성된 UI의 테마 변수. 실제 값은 src/lib/ci/tokens.ts 에서 오고
+ * <ThemeVars>가 런타임에 :root 에 덮어쓴다. 아래는 첫 페인트용 기본값(DB CI)이다.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1a1f1c;
+  --card: #ffffff;
+  --card-foreground: #1a1f1c;
+  --popover: #ffffff;
+  --popover-foreground: #1a1f1c;
+  --primary: #00854a;
+  --primary-foreground: #ffffff;
+  --secondary: #e6f4ec;
+  --secondary-foreground: #006b3c;
+  --muted: #f6f8f7;
+  --muted-foreground: #5f6b64;
+  --accent: #e6f4ec;
+  --accent-foreground: #006b3c;
+  --destructive: #c8102e;
+  --border: #dce3de;
+  --input: #dce3de;
+  --ring: #00854a;
+  --radius: 0.375rem;
+  --chart-1: #00854a;
+  --chart-2: #5fb58a;
+  --chart-3: #b5dcc6;
+  --font-brand: system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
+  font-family:
+    "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo",
+    "Malgun Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 생성된 UI가 그려지는 영역: CI 서체·본문색 적용 */
+.ci-surface {
+  font-family: var(--font-brand);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--background);
 }

@@ -8,7 +8,7 @@ for (const prompt of ["운영 대시보드", "신청 폼", "CI 위반 시연 대
   const a = getAffiliate("db-inc"); const c = createSpecStreamCompiler({root:"",elements:{}}); let n=0;
   for await (const l of runAgent({prompt, affiliate:a, currentSpec:null, llm: mockLlm(a.name), modelLabel:"mock"})) {
     const o = JSON.parse(l);
-    if (o.__meta) console.log(o.step ?? "usage", o.status ?? "", o.message ?? JSON.stringify(o), (o.issues||[]).map(i=>"\n    - "+i.rule+": "+i.message).join(""));
+    if (o.__meta) console.log(o.step ?? "usage", o.status ?? "", o.message ?? JSON.stringify(o), (o.issues||[]).map((i: {rule: string; message: string})=>"\n    - "+i.rule+": "+i.message).join(""));
     else { c.push(l); n++; }
   }
   const spec = c.getResult();
