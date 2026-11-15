@@ -1,9 +1,8 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { dbTheme, themeToCssVars } from "@/lib/ci/tokens";
 
 export const metadata: Metadata = {
   title: "DB CI UI Studio",
@@ -13,8 +12,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className={cn("h-full", "font-sans", geist.variable)}>
-      <body className="h-full">{children}</body>
+    // 서비스 화면(shadcn/ui) 자체도 DB CI 토큰으로 칠한다. 값의 출처는 tokens.ts 하나.
+    <html
+      lang="ko"
+      className="h-full font-sans"
+      style={themeToCssVars(dbTheme) as CSSProperties}
+    >
+      <body className="h-full">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

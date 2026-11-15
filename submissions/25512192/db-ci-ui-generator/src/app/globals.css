@@ -7,7 +7,7 @@
 @source "../../node_modules/@json-render/shadcn/dist";
 
 @layer base {
-  /* shadcn 관례: 색을 지정하지 않은 테두리는 CI의 border 토큰을 쓴다 */
+  /* 색을 지정하지 않은 테두리는 border 토큰을 쓴다 (아래 @apply가 이 빌드에서 누락되는 경우 대비) */
   *,
   ::before,
   ::after {
@@ -25,8 +25,8 @@
 }
 
 /*
- * 생성된 UI의 테마 변수. 실제 값은 src/lib/ci/tokens.ts 에서 오고
- * <ThemeVars>가 런타임에 :root 에 덮어쓴다. 아래는 첫 페인트용 기본값(DB CI)이다.
+ * shadcn/ui 기본(뉴트럴) 토큰. 실제 서비스 화면에는 layout.tsx가 src/lib/ci/tokens.ts 의
+ * DB CI 토큰을 <html style>로 덮어쓰고, 생성 미리보기는 선택한 테마를 영역 단위로 다시 덮어쓴다.
  */
 :root {
   --card: oklch(1 0 0);
@@ -91,7 +91,7 @@
   --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 6px);
   --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+  --font-sans: "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -113,9 +113,6 @@ body {
 }
 
 body {
-  font-family:
-    "Pretendard Variable", Pretendard, "Noto Sans KR", "Apple SD Gothic Neo",
-    "Malgun Gothic", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

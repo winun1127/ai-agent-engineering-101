@@ -4,7 +4,15 @@ import { useCallback, useRef, useState } from "react";
 import { createSpecStreamCompiler, type Spec } from "@json-render/core";
 import type { AgentEvent, UsageEvent } from "@/lib/agent/events";
 
-export type RunResult = { spec: Spec; events: AgentEvent[]; lines: string[] };
+export type RunResult = {
+  spec: Spec;
+  events: AgentEvent[];
+  lines: string[];
+  /** 모델 호출 실패 등 오류 메시지 */
+  error?: string;
+  /** 사용자가 중지함 */
+  aborted?: boolean;
+};
 
 /**
  * /api/generate 의 JSONL 스트림을 읽는 훅.
@@ -24,7 +32,7 @@ export function useAgentStream(api = "/api/generate") {
     async (
       prompt: string,
       opts: { affiliateId: string; previousSpec: Spec | null },
-    ): Promise<RunResult | null> => {
+    ): Promise<RunResult> => {
       abortRef.current?.abort();
       const abort = new AbortController();
       abortRef.current = abort;
@@ -35,6 +43,13 @@ export function useAgentStream(api = "/api/generate") {
       const compiler = createSpecStreamCompiler<Spec>(structuredClone(base));
       const collectedEvents: AgentEvent[] = [];
       const collectedLines: string[] = [];
+      let failure: string | undefined;
+      const partial = (extra: Partial<RunResult>): RunResult => ({
+        spec: structuredClone(compiler.getResult()),
+        events: collectedEvents,
+        lines: collectedLines,
+        ...extra,
+      });
 
       setIsStreaming(true);
       setError(null);
@@ -54,7 +69,10 @@ export function useAgentStream(api = "/api/generate") {
           const ev = parsed as unknown as AgentEvent;
           collectedEvents.push(ev);
           setEvents([...collectedEvents]);
-          if (ev.step === "done" && ev.status === "error") setError(ev.message);
+          if (ev.step === "done" && ev.status === "error") {
+            failure = ev.message;
+            setError(ev.message);
+          }
         } else if (parsed.__meta === "usage") {
           setUsage(parsed as unknown as UsageEvent);
         } else {
@@ -93,15 +111,12 @@ export function useAgentStream(api = "/api/generate") {
           lines.forEach(handleLine);
         }
         handleLine(buffer);
-        return {
-          spec: structuredClone(compiler.getResult()),
-          events: collectedEvents,
-          lines: collectedLines,
-        };
+        return partial({ error: failure });
       } catch (err) {
-        if ((err as Error).name === "AbortError") return null;
-        setError(err instanceof Error ? err.message : String(err));
-        return null;
+        if ((err as Error).name === "AbortError") return partial({ aborted: true });
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        return partial({ error: message });
       } finally {
         if (abortRef.current === abort) setIsStreaming(false);
       }
