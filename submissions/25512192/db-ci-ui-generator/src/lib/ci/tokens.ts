@@ -4,8 +4,6 @@
  * 여기 값은 (1) 미리보기의 CSS 변수, (2) 에이전트 시스템 프롬프트의 CI 규칙,
  * (3) CI 린트 규칙 세 곳에 동시에 쓰인다. 값을 바꾸면 세 곳이 함께 바뀐다.
  *
- * 주의: 아래 색상 hex는 공개된 DB 로고의 그린 계열을 눈으로 맞춘 "근사값"이다.
- * 공식 CI 매뉴얼의 전용색상(Pantone/CMYK/RGB)을 확보하면 `brand` 블록만 교체하면 된다.
  */
 
 export type ThemeVars = {
@@ -41,16 +39,65 @@ export type CiTheme = {
   vars: ThemeVars;
 };
 
-/** 브랜드 원색. 공식 값 확보 시 이 블록만 교체. */
+/**
+ * DB그룹 CI 전용색상.
+ *
+ * 출처: DB Inc. "CI 소개"(dbinc.co.kr/main/content/view/ci.do), DB손해보험 "색상규정"(idbins.com),
+ * DB하이텍 CI 페이지에 게시된 값. DB Green은 세 곳의 값이 일치한다.
+ * 그룹 CI 아카이브(ci.dbgroup.co.kr/ci-manual/color-usage)는 사이트가 자동화 요청을 차단해
+ * 직접 대조하지 못했다 — 발표 전에 브라우저로 열어 아래 값과 한 번 대조할 것.
+ */
+export const ciPalette = [
+  {
+    id: "green",
+    name: "DB Green",
+    role: "메인 컬러 · 로고마크",
+    hex: ["#00854A"],
+    rgb: "R0 G133 B74",
+    cmyk: "C100 M30 Y100",
+    pantone: "7732C",
+  },
+  {
+    id: "green-gradient",
+    name: "DB Green Gradient",
+    role: "생명",
+    hex: ["#8DC63F", "#009559"],
+    rgb: "R141 G198 B63 ~ R0 G149 B89",
+    cmyk: "M50 Y100 ~ C100 M15 Y90",
+    pantone: "376C ~ 348C",
+  },
+  {
+    id: "blue-gradient",
+    name: "DB Blue Gradient",
+    role: "물 · 젊음",
+    hex: ["#14B1E7", "#0061AF"],
+    rgb: "R20 G177 B231 ~ R0 G97 B175",
+    cmyk: null,
+    pantone: "2191C ~ 2133C",
+  },
+  {
+    id: "red-gradient",
+    name: "DB Red Gradient",
+    role: "태양",
+    hex: ["#F47920", "#C9252C"],
+    rgb: "R244 G121 B32 ~ R201 G37 B44",
+    cmyk: "M65 Y100 ~ C20 M100 Y100",
+    pantone: "158C ~ 2350C",
+  },
+] as const;
+
+/** UI 토큰으로 쓰는 색. 위 4줄(green/blue/orange/red)은 CI 전용색상, 나머지는 UI용 파생 중립색. */
 export const brand = {
-  green: "#00854A", // DB Green (근사값)
-  greenDark: "#006B3C", // hover / 강조
-  greenTint: "#E6F4EC", // 옅은 배경
-  ink: "#1A1F1C", // 본문 텍스트
-  gray: "#5F6B64", // 보조 텍스트
-  line: "#DCE3DE", // 구분선
-  surface: "#F6F8F7", // 페이지 배경
-  alert: "#C8102E", // 오류/위험
+  green: "#00854A", // DB Green (공식)
+  blue: "#0061AF", // DB Blue Gradient 끝색 (공식)
+  orange: "#F47920", // DB Red Gradient 시작색 (공식)
+  red: "#C9252C", // DB Red Gradient 끝색 (공식) — 오류/위험 표시에 사용
+  greenDark: "#006B3C", // 파생: DB Green을 어둡게 (보조 텍스트·hover)
+  greenTint: "#E6F4EC", // 파생: DB Green 옅은 배경
+  ink: "#1A1F1C", // 파생: 본문 텍스트
+  gray: "#5F6B64", // 파생: 보조 텍스트
+  line: "#DCE3DE", // 파생: 구분선
+  surface: "#F6F8F7", // 파생: 옅은 면
 } as const;
 
 const systemFont =
@@ -75,14 +122,14 @@ export const dbTheme: CiTheme = {
     "muted-foreground": brand.gray,
     accent: brand.greenTint,
     "accent-foreground": brand.greenDark,
-    destructive: brand.alert,
+    destructive: brand.red,
     border: brand.line,
     input: brand.line,
     ring: brand.green,
     radius: "0.375rem",
     "chart-1": brand.green,
-    "chart-2": "#5FB58A",
-    "chart-3": "#B5DCC6",
+    "chart-2": brand.blue,
+    "chart-3": brand.orange,
     "font-brand": systemFont,
   },
 };
